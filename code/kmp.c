@@ -7,8 +7,8 @@
 // Function prototypes
 void compute_prefix_function(const char *P, int m, int *pi);
 void kmp_matcher(const char *T, const char *P, int n, int m);
-double benchmark_kmp(const char *text, const char *pattern, int text_size, int pattern_size);
-void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int k, const char *output_file);
+double benchmark_brute_force(const char *text, const char *pattern, int text_size, int pattern_size);
+void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int k, FILE *results_file);
 char *generate_pattern_multiple(const char *pattern, int pattern_length, int multiplier);
 
 void compute_prefix_function(const char *P, int m, int *pi) {
@@ -47,15 +47,14 @@ void kmp_matcher(const char *T, const char *P, int n, int m) {
 }
 
 // Benchmark a single execution of the KMP algorithm
-double benchmark_kmp(const char *text, const char *pattern, int text_size, int pattern_size) {
+double benchmark_brute_force(const char *text, const char *pattern, int text_size, int pattern_size) {
     clock_t start_time = clock();
     kmp_matcher(text, pattern, text_size, pattern_size);
     clock_t end_time = clock();
     return ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
 }
 
-// Run the benchmark `k` times for a given pattern
-void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int k, const char *output_file) {
+void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int k, FILE *results_file) {
     // Load the text from the file
     FILE *file = fopen(file_path, "r");
     if (!file) {
@@ -78,25 +77,17 @@ void run_benchmark(const char *file_path, const char *pattern, int pattern_size,
     text[file_size] = '\0';
     fclose(file);
 
-    // Open the output file
-    FILE *results_file = fopen(output_file, "w");
-    if (!results_file) {
-        perror("Failed to open output file");
-        free(text);
-        exit(1);
-    }
-
     // Run the benchmark `k` times for the given pattern
     for (int i = 0; i < k; i++) {
-        double execution_time = benchmark_kmp(text, pattern, file_size, pattern_size);
+        double execution_time = benchmark_brute_force(text, pattern, file_size, pattern_size);
         fprintf(results_file, "Run %d: %.6f seconds\n", i + 1, execution_time);
         printf("Run %d: %.6f seconds\n", i + 1, execution_time); // Optional: print to console
     }
 
     // Clean up
-    fclose(results_file);
     free(text);
 }
+
 
 // Generate a pattern by concatenating it `multiplier` times
 char *generate_pattern_multiple(const char *pattern, int pattern_length, int multiplier) {
@@ -119,13 +110,13 @@ char *generate_pattern_multiple(const char *pattern, int pattern_length, int mul
 // Main function
 int main() {
     const char *file_path = "HTT.txt";    // Input text file
-    const char *base_pattern = "cag"; // Base pattern
+    const char *base_pattern = "cag";    // Base pattern
     const int base_pattern_length = strlen(base_pattern);
     int k = 5;                            // Number of test runs for each pattern
     int L = 4;                            // Maximum multiplier for the pattern
-    const char *output_file = "results.txt"; // Output file to store results
+    const char *output_file = "kmp_results.txt"; // Output file to store results
 
-    // Run benchmarks for the base pattern and its multiples
+    // Open the results file once in write mode
     FILE *results_file = fopen(output_file, "w");
     if (!results_file) {
         perror("Failed to open output file");
@@ -140,13 +131,14 @@ int main() {
         printf("Benchmarking pattern of length %ld (multiplier %d):\n", 
                 strlen(current_pattern), multiplier);
 
-        run_benchmark(file_path, current_pattern, base_pattern_length * multiplier, k, output_file);
+        run_benchmark(file_path, current_pattern, base_pattern_length * multiplier, k, results_file);
 
         free(current_pattern);
     }
 
-    fclose(results_file);
+    fclose(results_file); // Close the results file at the end
     printf("Benchmark complete. Results saved to '%s'.\n", output_file);
 
     return 0;
 }
+
