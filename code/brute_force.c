@@ -5,13 +5,15 @@
 
 
 // Function prototypes
-void brute_force_matcher(const char *T, const char *P, int n, int m);
-double benchmark_brute_force(const char *text, const char *pattern, int text_size, int pattern_size);
-void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int k, FILE *results_file);
+void brute_force_matcher(const char *T, const char *P, int n, int m, int *shifts, int *count);
+double single_benchmark(const char *text, const char *pattern, int *shifts, int text_size, int pattern_size, int *count);
+void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int multiplier, int k, FILE *results_file);
 char *generate_pattern_multiple(const char *pattern, int pattern_length, int multiplier);
+void longest_repeated_pattern_occurrences(int shifts[], int n, int pattern_length, int *max_length, int *start_shift) ;
 
+void brute_force_matcher(const char *T, const char *P, int n, int m, int *shifts, int *count) {
+    int local_count = 0;
 
-void brute_force_matcher(const char *T, const char *P, int n, int m) {
     for (int s = 0; s <= n - m; s++) {
         int match = 1; // Assume a match until proven otherwise
         for (int j = 0; j < m; j++) {
@@ -21,20 +23,48 @@ void brute_force_matcher(const char *T, const char *P, int n, int m) {
             }
         }
         if (match) {
-            printf("Pattern occurs with offset %d\n", s);
+            shifts[local_count++] = s;
+        }
+    }
+
+    *count = local_count;
+}
+
+void longest_repeated_pattern_occurrences(int shifts[], int n, int pattern_length, int *max_length, int *start_shift) {
+    if (n == 0) {
+        *max_length = 0;
+        *start_shift = -1; // Indicate no valid sequence
+        return;
+    }
+
+    *max_length = 1;
+    *start_shift = shifts[0];
+    int current_length = 1;
+    int current_start_shift = shifts[0];
+
+    for (int i = 1; i < n; i++) {
+        if (shifts[i] - shifts[i - 1] == pattern_length) {
+            current_length++;
+            if (current_length > *max_length) {
+                *max_length = current_length;
+                *start_shift = current_start_shift;
+            }
+        } else {
+            current_length = 1;
+            current_start_shift = shifts[i];
         }
     }
 }
 
 // Benchmark a single execution of the KMP algorithm
-double benchmark_brute_force(const char *text, const char *pattern, int text_size, int pattern_size) {
+double single_benchmark(const char *text, const char *pattern, int *shifts, int text_size, int pattern_size, int *count) {
     clock_t start_time = clock();
-    brute_force_matcher(text, pattern, text_size, pattern_size);
+    brute_force_matcher(text, pattern, text_size, pattern_size, shifts, count);
     clock_t end_time = clock();
     return ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
 }
 
-void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int k, FILE *results_file) {
+void run_benchmark(const char *file_path, const char *pattern, int pattern_size, int multiplier, int k, FILE *results_file) {
     // Load the text from the file
     FILE *file = fopen(file_path, "r");
     if (!file) {
@@ -57,15 +87,47 @@ void run_benchmark(const char *file_path, const char *pattern, int pattern_size,
     text[file_size] = '\0';
     fclose(file);
 
+    int *shifts = malloc ((file_size / pattern_size) * sizeof(int));
+    if (!shifts) {
+        perror("Failed to allocate shifts");
+        fclose(file);
+        exit(1);
+    }
+
+    int *count = malloc (sizeof(int));
+    if (!shifts) {
+        perror("Failed to allocate count");
+        fclose(file);
+        exit(1);
+    }
+
+    int *max_shift = malloc (sizeof(int));
+    if (!shifts) {
+        perror("Failed to allocate max_shift");
+        fclose(file);
+        exit(1);
+    }
+
+    int *max_length = malloc (sizeof(int));
+    if (!shifts) {
+        perror("Failed to allocate max_length");
+        fclose(file);
+        exit(1);
+    }
+
     // Run the benchmark `k` times for the given pattern
     for (int i = 0; i < k; i++) {
-        double execution_time = benchmark_brute_force(text, pattern, file_size, pattern_size);
-        fprintf(results_file, "Run %d: %.6f seconds\n", i + 1, execution_time);
-        printf("Run %d: %.6f seconds\n", i + 1, execution_time); // Optional: print to console
+        double execution_time = single_benchmark(text, pattern, shifts, file_size, pattern_size, count);
+        longest_repeated_pattern_occurrences(shifts, *count, pattern_size, max_length, max_shift);
+        fprintf(results_file, "%d,%d,%d,%d,%.7f\n", multiplier, i + 1, *max_length, *max_shift, execution_time);
+        printf("Run %d: %.7f seconds\n", i + 1, execution_time); // Optional: print to console
     }
 
     // Clean up
     free(text);
+    free(shifts);
+    free(count);
+    free(max_shift);
 }
 
 
@@ -88,13 +150,18 @@ char *generate_pattern_multiple(const char *pattern, int pattern_length, int mul
 }
 
 // Main function
-int main() {
-    const char *file_path = "HTT.txt";    // Input text file
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        printf("Usage: %s <input_file_path> <output_file_path>\n", argv[0]);
+        return 1;
+    }
+
+    const char *file_path = argv[1];      // Input file path
+    const char *output_file = argv[2];   // Output file path
     const char *base_pattern = "cag";    // Base pattern
     const int base_pattern_length = strlen(base_pattern);
     int k = 5;                            // Number of test runs for each pattern
     int L = 4;                            // Maximum multiplier for the pattern
-    const char *output_file = "brute_force_results.txt"; // Output file to store results
 
     // Open the results file once in write mode
     FILE *results_file = fopen(output_file, "w");
@@ -103,15 +170,15 @@ int main() {
         exit(1);
     }
 
+    fprintf(results_file, "multiplier,run,max_length,shift,time\n");
+
     for (int multiplier = 1; multiplier <= L; multiplier++) {
         char *current_pattern = generate_pattern_multiple(base_pattern, base_pattern_length, multiplier);
 
-        fprintf(results_file, "Benchmarking pattern of length %ld (multiplier %d):\n", 
-                strlen(current_pattern), multiplier);
         printf("Benchmarking pattern of length %ld (multiplier %d):\n", 
                 strlen(current_pattern), multiplier);
 
-        run_benchmark(file_path, current_pattern, base_pattern_length * multiplier, k, results_file);
+        run_benchmark(file_path, current_pattern, base_pattern_length * multiplier, multiplier, k, results_file);
 
         free(current_pattern);
     }
