@@ -1,2 +1,0 @@
-htt_01.txt
-htt_02.txt
