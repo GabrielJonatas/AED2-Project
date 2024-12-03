@@ -2,12 +2,12 @@ import os
 import subprocess
 
 # Path to your compiled C programs
-kmp = "./kmp"
-brute_force = "./brute_force"
+kmp = ".\kmp"
+brute_force = ".\brute_force"
 
-input_path = "./input"
-output_path = "./output"
-pattern="cag"
+input_path = ".\input"
+output_path = ".\output"
+pattern="CAG"
 number_of_trials="1000"
 pattern_multiplier="3"
 suffix = "results"
