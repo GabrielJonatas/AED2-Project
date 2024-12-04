@@ -3,6 +3,8 @@ from scipy.stats import ttest_ind
 import os
 import numpy as np
 
+pd.set_option('display.float_format', '{:.9f}'.format)  # Set to 10 decimal places
+
 # Define the folder containing the CSV files
 input_path = 'input'
 output_path = 'output'
@@ -70,4 +72,4 @@ consolidated_df = consolidated_df.sort_values(by=['data_file', 'multiplier'])
 print(consolidated_df)
 
 # Save the results to file
-consolidated_df.to_csv('sorted_consolidated_results.csv', index=False)
+consolidated_df.to_csv('sorted_consolidated_results.csv', index=False, float_format='%.9f')
